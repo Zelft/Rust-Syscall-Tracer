@@ -1,0 +1,1 @@
+/home/danny/Documentos/Tareas/Tarea1/Tarea-Corta-1-Operativos/rastreador/target/debug/rastreador: /home/danny/Documentos/Tareas/Tarea1/Tarea-Corta-1-Operativos/rastreador/src/main.rs /home/danny/Documentos/Tareas/Tarea1/Tarea-Corta-1-Operativos/rastreador/src/system_calls.rs
