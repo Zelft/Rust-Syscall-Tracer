@@ -17,20 +17,44 @@ mod system_calls;
 fn main() {
 
     let argv: Vec<_> = std::env::args().collect();
-    let mut cmd = Command::new(&argv[1]);
-    for arg in argv {
-        println!("{}", arg);
-        cmd.arg(arg);
+    let mut progArguments : Vec<String > = vec![];
+    let optionv = String::from("-v");
+    let optionV = String::from("-V");
+    let mut v_option : bool = false;
+    let mut V_option : bool = false;
+    let mut first : bool = false;
+
+    let mut cmd = Command :: new(&argv[0]); //::new(&argv[0]);
+    for i in argv {
+        if i!="-v" && i!="-V" && i!="rastreador" && i!="./rastreador" && first==false{
+            println!("Prog: {}",i);
+            cmd = Command::new(i);
+            first=true;
+        }
+        else if i!="-v" && i!="-V" && i!="rastreador" && i!="./rastreador" && first==true{
+            println!("argumento {}",i);
+            cmd.arg(i);
+        }
+        else if i=="-v"{
+            println!("Opcion -v");
+            v_option = true;
+        }else if i=="-V"{
+            println!("Opcion -V");
+            V_option = true;
+        } 
     }
+
+
     //Hashmap to store the count call, can compare to strace for numbers!
     let mut map = HashMap::new();
 
     //allow the child to be traced
-    let output = cmd.before_exec(traceme);
+    // let output = cmd.before_exec(traceme);
 
-    let mut child = cmd.spawn().expect("child process failed");
+    // let mut child = cmd.spawn().expect("child process failed");
 
-    let pid = nix::unistd::Pid::from_raw(child.id() as libc::pid_t);
+    // let pid = nix::unistd::Pid::from_raw(child.id() as libc::pid_t);
+    let pid = getProcessId(cmd);
 
     //allow parent to be stopped everytime there is a SIGTRAP sent because a syscall happened.
     ptrace::setoptions(
@@ -46,58 +70,159 @@ fn main() {
     /// need to stop once.  
     let mut exit = true;
 
-    loop {
-        let start = Instant::now();
-        //get the registers from the address where ptrace is stopped.
-        let regs = match get_regs(pid) {
-            Ok(x) => x,
-            Err(err ) => {
-                eprintln!("End of ptrace {:?}", err);
-                break;
-            }
-        };
-        // do stuff
-        
-        let elapsed = start.elapsed();
-
-        // Debug format
-        //println!("Init: {:?}", start.());
-
-        // Format as milliseconds rounded down
-        // Since Rust 1.33:
-        //println!("Fin: {:?}", elapsed.as_secs_f64());
-
-
-
-        //println!("{:?}", regs.eflags);
-        //pause();
-        if exit {
-            /// syscall number is stored inside orig_rax register. Transalte from number
-            /// to syscall name using an array that stores all syscalls.  
-            let mut syscallName = system_calls::SYSTEM_CALL_NAMES[(regs.orig_rax) as usize];
-
-            //println!("{}", &syscallName);
-            //println!("{} {} {} {} {} {} {} {} {} {} {} {} {} {} {} {} ",elapsed.as_secs_f64(),regs.r15, regs.r14,regs.r13, regs.r12,regs.r11, regs.r10,regs.r9,regs.r8,regs.rbp,regs.rbx,regs.rax,regs.rcx,regs.rdx,regs.rsi,regs.rdi);
-
-            match map.get(&syscallName) {
-                
-                Some(&number) => map.insert(syscallName, number + 1),
-                _ => map.insert(syscallName, 1),
+    if(V_option==true){
+        loop {
+            let start = Instant::now();
+            //get the registers from the address where ptrace is stopped.
+            let regs = match get_regs(pid) {
+                Ok(x) => x,
+                Err(err ) => {
+                    eprintln!("End of ptrace {:?}", err);
+                    break;
+                }
             };
+            // do stuff
+            
+            let elapsed = start.elapsed();
+    
+            // Debug format
+            //println!("Init: {:?}", start.());
+    
+            // Format as milliseconds rounded down
+            // Since Rust 1.33:
+            //println!("Fin: {:?}", elapsed.as_secs_f64());
+            //println!("{:?}", regs.eflags);
+            //pause();
+            if exit {
+                /// syscall number is stored inside orig_rax register. Transalte from number
+                /// to syscall name using an array that stores all syscalls.  
+                let mut syscallName = system_calls::SYSTEM_CALL_NAMES[(regs.orig_rax) as usize];
+    
+                println!("{}", &syscallName);
+                //println!("{} {} {} {} {} {} {} {} {} {} {} {} {} {} {} {} ",elapsed.as_secs_f64(),regs.r15, regs.r14,regs.r13, regs.r12,regs.r11, regs.r10,regs.r9,regs.r8,regs.rbp,regs.rbx,regs.rax,regs.rcx,regs.rdx,regs.rsi,regs.rdi);
+                pause();
+                match map.get(&syscallName) {
+                    
+                    Some(&number) => map.insert(syscallName, number + 1),
+                    _ => map.insert(syscallName, 1),
+                };
+            }
+    
+            unsafe {
+                ptrace(
+                    Request::PTRACE_SYSCALL,
+                    pid,
+                    ptr::null_mut(),
+                    ptr::null_mut(),
+                );
+            }
+    
+            waitpid(pid, None);
+            exit = !exit;
+        }
+    }else if(v_option==true){
+        loop {
+            let start = Instant::now();
+            //get the registers from the address where ptrace is stopped.
+            let regs = match get_regs(pid) {
+                Ok(x) => x,
+                Err(err ) => {
+                    eprintln!("End of ptrace {:?}", err);
+                    break;
+                }
+            };
+            // do stuff
+            
+            let elapsed = start.elapsed();
+    
+            // Debug format
+            //println!("Init: {:?}", start.());
+    
+            // Format as milliseconds rounded down
+            // Since Rust 1.33:
+            //println!("Fin: {:?}", elapsed.as_secs_f64());
+            //println!("{:?}", regs.eflags);
+            //pause();
+            if exit {
+                /// syscall number is stored inside orig_rax register. Transalte from number
+                /// to syscall name using an array that stores all syscalls.  
+                let mut syscallName = system_calls::SYSTEM_CALL_NAMES[(regs.orig_rax) as usize];
+    
+                //println!("{}", &syscallName);
+                //println!("{} {} {} {} {} {} {} {} {} {} {} {} {} {} {} {} ",elapsed.as_secs_f64(),regs.r15, regs.r14,regs.r13, regs.r12,regs.r11, regs.r10,regs.r9,regs.r8,regs.rbp,regs.rbx,regs.rax,regs.rcx,regs.rdx,regs.rsi,regs.rdi);
+                println!("{}", &syscallName);
+        
+                match map.get(&syscallName) {
+                    
+                    Some(&number) => map.insert(syscallName, number + 1),
+                    _ => map.insert(syscallName, 1),
+                };
+            }
+    
+            unsafe {
+                ptrace(
+                    Request::PTRACE_SYSCALL,
+                    pid,
+                    ptr::null_mut(),
+                    ptr::null_mut(),
+                );
+            }
+    
+            waitpid(pid, None);
+            exit = !exit;
         }
 
-        unsafe {
-            ptrace(
-                Request::PTRACE_SYSCALL,
-                pid,
-                ptr::null_mut(),
-                ptr::null_mut(),
-            );
+    }else{
+        loop {
+            let start = Instant::now();
+            //get the registers from the address where ptrace is stopped.
+            let regs = match get_regs(pid) {
+                Ok(x) => x,
+                Err(err ) => {
+                    eprintln!("End of ptrace {:?}", err);
+                    break;
+                }
+            };
+            // do stuff
+            
+            let elapsed = start.elapsed();
+    
+            // Debug format
+            //println!("Init: {:?}", start.());
+    
+            // Format as milliseconds rounded down
+            // Since Rust 1.33:
+            //println!("Fin: {:?}", elapsed.as_secs_f64());
+            
+            if exit {
+                /// syscall number is stored inside orig_rax register. Transalte from number
+                /// to syscall name using an array that stores all syscalls.  
+                let mut syscallName = system_calls::SYSTEM_CALL_NAMES[(regs.orig_rax) as usize];
+    
+                //println!("{}", &syscallName);
+                //println!("{} {} {} {} {} {} {} {} {} {} {} {} {} {} {} {} ",elapsed.as_secs_f64(),regs.r15, regs.r14,regs.r13, regs.r12,regs.r11, regs.r10,regs.r9,regs.r8,regs.rbp,regs.rbx,regs.rax,regs.rcx,regs.rdx,regs.rsi,regs.rdi);
+                //pause();
+                match map.get(&syscallName) {
+                    
+                    Some(&number) => map.insert(syscallName, number + 1),
+                    _ => map.insert(syscallName, 1),
+                };
+            }
+    
+            unsafe {
+                ptrace(
+                    Request::PTRACE_SYSCALL,
+                    pid,
+                    ptr::null_mut(),
+                    ptr::null_mut(),
+                );
+            }
+    
+            waitpid(pid, None);
+            exit = !exit;
         }
-
-        waitpid(pid, None);
-        exit = !exit;
     }
+
     let mut counter : i32 = 0;
     let mut word_size: usize = 22 as usize;
     let mut num_usize: usize = 4 as usize;
@@ -121,9 +246,21 @@ fn main() {
         counter+=number;
     }
     println!("------------------------------------------\n");
-    println!("Total System Calls: {}\n", counter);
-        
+    println!("Total System Calls: {}\n", counter); 
     
+}
+
+fn getProcessId(cmd:Command) -> nix::unistd::Pid{
+
+    let mut newCmd = cmd;
+
+    let output = newCmd.before_exec(traceme);
+
+    let mut child = newCmd.spawn().expect("child process failed");
+
+    let pid = nix::unistd::Pid::from_raw(child.id() as libc::pid_t);
+
+    return pid;
 }
 
 
@@ -150,4 +287,17 @@ fn traceme() -> std::io::Result<(())> {
         Err(e) => Err(std::io::Error::new(std::io::ErrorKind::Other, e)),
     }
 
+}
+
+fn pause() {
+
+    let mut stdin = io::stdin();
+    let mut stdout = io::stdout();
+
+    // We want the cursor to stay at the end of the line, so we print without a newline and flush manually.
+    write!(stdout, "Press any key to continue...").unwrap();
+    stdout.flush().unwrap();
+
+    // Read a single byte and discard
+    let _ = stdin.read(&mut [0u8]).unwrap();
 }
